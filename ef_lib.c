@@ -187,17 +187,14 @@ void ef_destroy(ef_t *ef)
     if (ef->destroy != NULL)
         ef->destroy(ef);
 
-    if (ef->links != NULL)
+    cc_for_each(&ef->links, link)
     {
-        cc_for_each(&ef->links, link)
-        {
-            zstr_free(&link->zmq_addr);
-            zstr_free(&link->zmq_transport_prefix);
-            zsock_destroy(&link->zmq_sock);
-        }
-
-        cc_cleanup(&ef->links);
+        zstr_free(&link->zmq_addr);
+        zstr_free(&link->zmq_transport_prefix);
+        zsock_destroy(&link->zmq_sock);
     }
+
+    cc_cleanup(&ef->links);
 
     free(ef);
 }
