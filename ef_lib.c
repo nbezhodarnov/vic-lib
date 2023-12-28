@@ -261,9 +261,9 @@ int ef_send(ef_t *ef, const char *name, const char *data)
             zstr_send(link->zmq_sock, data);
             return 1;
         }
-
-        return 0;
     }
+
+    return 0;
 }
 
 char *ef_recv(ef_t *ef, const char *name)
