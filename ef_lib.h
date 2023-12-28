@@ -1,38 +1,41 @@
 #ifndef EF_LIB_H
 #define EF_LIB_H
 
+typedef struct _vic_t vic_t;
+
 // Forward declaration of the execution flow structure
 // making it opaque to the user
-typedef struct _ef_t ef_t;
+typedef struct _vic_ef_t vic_ef_t;
 
-enum ef_abstraction_t {
+enum vic_abstraction_t {
     EF_THREAD = 0x01,
     EF_PROCESS = 0x02
 };
 
 // Initialize the ef library and return a pointer to the root execution flow
-ef_t *ef_init();
+vic_t *vic_init();
 
-// Cleanup the ef library
-void ef_cleanup();
+vic_t *vic_create(enum vic_abstraction_t abstraction);
 
 // Create a new child execution flow
-ef_t *ef_create(void (*start_routine)(ef_t *), enum ef_abstraction_t abstraction, void (*finished)(ef_t *));
+vic_ef_t *vic_ef_create(vic_t *vic, void (*start_routine)(vic_ef_t *), void (*finished)(vic_ef_t *));
 
-void ef_destroy(ef_t *ef);
+void vic_destroy(vic_t *vic);
 
-int ef_send(ef_t *ef, const char* name, const char* data);
+void vic_ef_destroy(vic_ef_t *ef);
 
-char* ef_recv(ef_t *ef, const char* name);
+int vic_ef_send(vic_ef_t *ef, const char* name, const char* data);
+
+char* vic_ef_recv(vic_ef_t *ef, const char* name);
 
 // Link two execution flows together
-void ef_link(ef_t *ef1, ef_t *ef2, const char *name);
+void vic_ef_link(vic_ef_t *ef1, vic_ef_t *ef2, const char *name);
 
 // Start an execution flow
-void ef_start(ef_t *ef);
+void vic_ef_start(vic_ef_t *ef);
 
 // Wait for an execution flow to finish
-void ef_wait(ef_t *ef);
+void vic_ef_wait(vic_ef_t *ef);
 
 
 

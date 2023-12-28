@@ -4,22 +4,22 @@
 
 #include "ef_lib.h"
 
-void routine3(ef_t *ef){
+void routine3(vic_ef_t *ef){
     printf("routine3 started\n");
 
     printf("pid: %d\n", getpid());
 
-    ef_send(ef, "test2", "hello");
+    vic_ef_send(ef, "test2", "hello");
 
-    char * data = ef_recv(ef, "test2");
+    char * data = vic_ef_recv(ef, "test2");
 
     printf("routine3 from test2: %s\n", data);
 
     free(data);
 
-    ef_send(ef, "test3", "hello");
+    vic_ef_send(ef, "test3", "hello");
 
-    data = ef_recv(ef, "test3");
+    data = vic_ef_recv(ef, "test3");
 
     printf("routine3 from test3: %s\n", data);
 
@@ -28,14 +28,14 @@ void routine3(ef_t *ef){
     printf("routine3 finished\n");
 };
 
-void routine4(ef_t *ef) {
+void routine4(vic_ef_t *ef) {
     printf("routine4 started\n");
 
     printf("pid: %d\n", getpid());
 
-    ef_send(ef, "test3", "hello");
+    vic_ef_send(ef, "test3", "hello");
 
-    char * data = ef_recv(ef, "test3");
+    char * data = vic_ef_recv(ef, "test3");
 
     printf("routine4 from test3: %s\n", data);
 
@@ -44,36 +44,36 @@ void routine4(ef_t *ef) {
     printf("routine4 finished\n");
 }
 
-void routine1(ef_t *ef)
+void routine1(vic_ef_t *ef)
 {
     printf("routine1 started\n");
 
-    char * data = ef_recv(ef, "test1");
+    char * data = vic_ef_recv(ef, "test1");
 
     printf("routine1 from test1: %s\n", data);
 
     free(data);
 
-    ef_send(ef, "test1", "bye");
+    vic_ef_send(ef, "test1", "bye");
 
-    data = ef_recv(ef, "test2");
+    data = vic_ef_recv(ef, "test2");
 
     printf("routine1 from test2: %s\n", data);
 
     free(data);
 
-    ef_send(ef, "test2", "bye");
+    vic_ef_send(ef, "test2", "bye");
 
     printf("routine1 finished\n");
 };
 
-void routine2(ef_t *ef)
+void routine2(vic_ef_t *ef)
 {
     printf("routine2 started\n");
 
-    ef_send(ef, "test1", "hello");
+    vic_ef_send(ef, "test1", "hello");
 
-    char * data = ef_recv(ef, "test1");
+    char * data = vic_ef_recv(ef, "test1");
 
     printf("routine2 from test1: %s\n", data);
 
@@ -84,37 +84,47 @@ void routine2(ef_t *ef)
 
 int main(int argc, char **argv)
 {
-    ef_t *main_ef = ef_init();
+    vic_t *main_vic = vic_init();
+    vic_t *vic1 = vic_create(EF_THREAD);
+    vic_t *vic2 = vic_create(EF_THREAD);
+    vic_t *vic3 = vic_create(EF_PROCESS);
+    vic_t *vic4 = vic_create(EF_PROCESS);
 
-    ef_t *ef1 = ef_create(routine1, EF_THREAD, NULL);
-    ef_t *ef2 = ef_create(routine2, EF_THREAD, NULL);
-    ef_t *ef3 = ef_create(routine3, EF_PROCESS, NULL);
-    ef_t *ef4 = ef_create(routine4, EF_PROCESS, NULL);
+    vic_ef_t *main_ef = vic_ef_create(main_vic, NULL, NULL);
+    vic_ef_t *ef1 = vic_ef_create(vic1, routine1, NULL);
+    vic_ef_t *ef2 = vic_ef_create(vic2, routine2, NULL);
+    vic_ef_t *ef3 = vic_ef_create(vic3, routine3, NULL);
+    vic_ef_t *ef4 = vic_ef_create(vic4, routine4, NULL);
 
     // ef1 and ef2 now are linked which allows them to communicate with each other
-    ef_link(ef1, ef2, "test1");
-    ef_link(ef1, ef3, "test2");
-    ef_link(ef3, ef4, "test3");
-
+    vic_ef_link(ef1, ef2, "test1");
+    vic_ef_link(ef1, ef3, "test2");
+    vic_ef_link(ef3, ef4, "test3");
 
     printf("main pid: %d\n", getpid());
 
-    ef_start(ef1);
-    ef_start(ef2);
-    ef_start(ef3);
-    ef_start(ef4);
+    vic_ef_start(ef1);
+    vic_ef_start(ef2);
+    vic_ef_start(ef3);
+    vic_ef_start(ef4);
 
-    ef_wait(ef1);
-    ef_wait(ef2);
-    ef_wait(ef3);
-    ef_wait(ef4);
+    vic_ef_wait(ef1);
+    vic_ef_wait(ef2);
+    vic_ef_wait(ef3);
+    vic_ef_wait(ef4);
 
-    ef_destroy(ef1);
-    ef_destroy(ef2);
-    ef_destroy(ef3);
-    ef_destroy(ef4);
+    vic_ef_destroy(ef1);
+    vic_ef_destroy(ef2);
+    vic_ef_destroy(ef3);
+    vic_ef_destroy(ef4);
 
-    ef_cleanup(main_ef);
+    vic_destroy(vic1);
+    vic_destroy(vic2);
+    vic_destroy(vic3);
+    vic_destroy(vic4);
+
+    vic_ef_destroy(main_ef);
+    vic_destroy(main_vic);
 
     return 0;
 }
