@@ -58,7 +58,7 @@ ef_t *_ef_new()
 ef_t *ef_init()
 {
     ef_t *main_ef = _ef_new();
-    main_ef->abstraction = EF_PROCESS;
+    main_ef->abstraction = EF_THREAD;
 
     return main_ef;
 }
@@ -127,6 +127,8 @@ void _ef_destroy_process(ef_t *ef)
 // Starting function for an execution flow that is a process
 void _ef_start_process(ef_t *ef)
 {
+    // TODO : Check for the errors of fork call
+
     ef->data = (void *)(uintptr_t)fork();
 
     // If the data is 0, then we are in the child process
@@ -147,6 +149,8 @@ void _ef_start_process(ef_t *ef)
 // Waiting function for an execution flow that is a process
 void _ef_wait_process(ef_t *ef)
 {
+    // TODO: Check if the process is launched
+
     waitpid((pid_t)(uintptr_t)ef->data, NULL, 0);
 }
 
