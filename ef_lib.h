@@ -17,10 +17,16 @@ ef_t *ef_init();
 void ef_cleanup();
 
 // Create a new child execution flow
-ef_t *ef_create(void (*start_routine)(ef_t *), enum ef_abstraction_t abstraction, void (*cleanup)());
+ef_t *ef_create(void (*start_routine)(ef_t *), enum ef_abstraction_t abstraction, void (*finished)(ef_t *));
+
+void ef_destroy(ef_t *ef);
+
+int ef_send(ef_t *ef, const char* name, const char* data);
+
+char* ef_recv(ef_t *ef, const char* name);
 
 // Link two execution flows together
-void ef_link(ef_t *ef1, ef_t *ef2);
+void ef_link(ef_t *ef1, ef_t *ef2, const char *name);
 
 // Start an execution flow
 void ef_start(ef_t *ef);

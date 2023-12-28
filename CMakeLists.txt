@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 # Project name
-project(EF_LIB_DRAFT)
+project(EF_LIB_DRAFT LANGUAGES C)
 
 file(GLOB SOURCES "*.c" "*.h")
 
