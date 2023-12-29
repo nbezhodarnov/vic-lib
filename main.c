@@ -97,9 +97,9 @@ int main(int argc, char **argv)
     vic_ef_t *ef4 = vic_ef_create(vic4, routine4, NULL);
 
     // ef1 and ef2 now are linked which allows them to communicate with each other
-    vic_ef_link(ef1, ef2, "test1");
-    vic_ef_link(ef1, ef3, "test2");
-    vic_ef_link(ef3, ef4, "test3");
+    vic_link(vic1, vic2, "test1");
+    vic_link(vic1, vic3, "test2");
+    vic_link(vic3, vic4, "test3");
 
     printf("main pid: %d\n", getpid());
 

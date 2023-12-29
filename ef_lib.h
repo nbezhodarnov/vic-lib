@@ -1,10 +1,10 @@
 #ifndef EF_LIB_H
 #define EF_LIB_H
 
+// Forward declaration of the virtual isolation context structure
 typedef struct _vic_t vic_t;
 
 // Forward declaration of the execution flow structure
-// making it opaque to the user
 typedef struct _vic_ef_t vic_ef_t;
 
 enum vic_abstraction_t {
@@ -29,7 +29,7 @@ int vic_ef_send(vic_ef_t *ef, const char* name, const char* data);
 char* vic_ef_recv(vic_ef_t *ef, const char* name);
 
 // Link two execution flows together
-void vic_ef_link(vic_ef_t *ef1, vic_ef_t *ef2, const char *name);
+void vic_link(vic_t *vic1, vic_t *vic2, const char *name);
 
 // Start an execution flow
 void vic_ef_start(vic_ef_t *ef);
