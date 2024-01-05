@@ -361,10 +361,11 @@ int main(int argc, char **argv)
     if (strcmp(val->routine_name, "NULL") == 0 || !(val->abstraction & EF_PROCESS))
       continue;
 
-    printf("%s: %d, %s\n", *key, val->abstraction, val->routine_name);
+    printf("Detected a vic (%s , %s) that uses external abstraction(s) \n", *key, val->routine_name);
 
     char name[256] = {};
     strcat(name, output_dir);
+    strcat(name, "/");
     strcat(name, val->routine_name);
     strcat(name, ".c");
 

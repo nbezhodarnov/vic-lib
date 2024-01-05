@@ -4,6 +4,10 @@
 
 #include "lib/vic.h"
 
+void routine0(vic_t *vic) {
+    printf("routine0 started\n");
+}
+
 void routine3(vic_t *vic){
     vic_ef_t *ef = vic_ef_get(vic);
 
@@ -27,10 +31,15 @@ void routine3(vic_t *vic){
 
     free(data);
 
+    // Example of how to create a new execution flow from an existing one
+    vic_t *vic5 = vic_create(EF_PROCESS);
+    vic_ef_t *ef5 = vic_ef_create(vic5, routine0, NULL);
+    vic_destroy(vic5);
+
     printf("routine3 finished\n");
 };
 
-void routine4(vic_t *vic) {
+void routine5(vic_t *vic) {
     vic_ef_t *ef = vic_ef_get(vic);
 
     printf("routine4 started\n");
@@ -102,9 +111,9 @@ int main(int argc, char **argv)
     vic_ef_t *ef1 = vic_ef_create(vic1, routine1, NULL);
     vic_ef_t *ef2 = vic_ef_create(vic2, routine2, NULL);
     vic_ef_t *ef3 = vic_ef_create(vic3, routine3, NULL);
-    vic_ef_t *ef4 = vic_ef_create(vic4, routine4, NULL);
+    vic_ef_t *ef4 = vic_ef_create(vic4, routine5, NULL);
 
-    // ef1 and ef2 now are linked which allows them to communicate with each other
+    // some VICs now are linked which allows them to communicate with each other
     vic_link(vic1, vic2, "test1");
     vic_link(vic1, vic3, "test2");
     vic_link(vic3, vic4, "test3");
