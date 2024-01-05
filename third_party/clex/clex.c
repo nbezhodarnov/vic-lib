@@ -77,3 +77,12 @@ clexToken clex(clexLexer *lexer) {
   strncpy(part, lexer->content + start, lexer->position - start);
   return (clexToken){.lexeme = part, .kind = UNDEFINED};
 }
+
+clexToken clexNoSpace(clexLexer *lexer) {
+  clexToken token = clex(lexer);
+  
+  while (token.kind == SPACE)
+    token = clex(lexer);
+  
+  return token;
+}

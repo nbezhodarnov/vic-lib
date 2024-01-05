@@ -36,5 +36,6 @@ void clexReset(clexLexer *lexer, const char *content);
 bool clexRegisterKind(clexLexer *lexer, const char *re, int kind);
 void clexDeleteKinds(clexLexer *lexer);
 clexToken clex(clexLexer *lexer);
+clexToken clexNoSpace(clexLexer *lexer);
 
 #endif

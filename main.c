@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "ef_lib.h"
+#include "lib/vic.h"
 
 void routine3(vic_t *vic){
     vic_ef_t *ef = vic_ef_get(vic);

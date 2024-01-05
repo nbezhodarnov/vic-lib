@@ -1,4 +1,4 @@
-#include "ef_lib.h"
+#include "vic.h"
 #include "pthread.h"
 #include "stdlib.h"
 

@@ -1,5 +1,5 @@
-#ifndef EF_LIB_H
-#define EF_LIB_H
+#ifndef VIC_LIB_H
+#define VIC_LIB_H
 
 // Forward declaration of the virtual isolation context structure
 typedef struct _vic_t vic_t;
@@ -41,4 +41,4 @@ void vic_ef_wait(vic_ef_t *ef);
 
 
 
-#endif //EF_LIB_H
+#endif // VIC_LIB_H
