@@ -6,7 +6,7 @@
 #include <czmq.h>
 
 #define CC_NO_SHORT_NAMES
-#include "cc.h"
+#include "third_party/cc/cc.h"
 
 #define ADDR_BUFFER_LEN 256
 
@@ -31,8 +31,8 @@ struct _vic_t
 
     _vic_link_list_t links; // Pointer to the linked list of links between virtual isolation contexts
 
-    void (*start)(vic_ef_t *); // Pointer to the function that will start the execution flow
-    void (*wait)(vic_ef_t *);  // Pointer to the function that will wait for the execution flow to finish
+    void (*start)(vic_t *); // Pointer to the function that will start the execution flow
+    void (*wait)(vic_t *);  // Pointer to the function that will wait for the execution flow to finish
 
     void (*destroy)(vic_t *); // Pointer to the function that will destroy the execution flow cleaning up all the resources
 };
@@ -42,8 +42,8 @@ struct _vic_ef_t
 {
     vic_t *vic; // Pointer to the virtual isolation context that the execution flow belongs to
 
-    void (*routine)(vic_ef_t *);  // Pointer to the routine that the execution flow will execute
-    void (*finished)(vic_ef_t *); // Pointer to the function that will be called when the execution flow is about to be destroyed
+    void (*routine)(vic_t *);  // Pointer to the routine that the execution flow will execute
+    void (*finished)(vic_t *); // Pointer to the function that will be called when the execution flow is about to be destroyed
 };
 
 vic_t *_vic_new()
@@ -104,8 +104,10 @@ void vic_destroy(vic_t *vic)
 
 void vic_ef_destroy(vic_ef_t *ef)
 {
-    if (ef->finished != NULL)
-        ef->finished(ef);
+    if (ef->finished != NULL) { 
+        vic_t *vic = ef->vic;
+        ef->finished(vic);
+    }
 
     ef->vic->ef = NULL;
     free(ef);
@@ -113,14 +115,14 @@ void vic_ef_destroy(vic_ef_t *ef)
 
 void *_vic_thread_start_helper(void *data)
 {
-    vic_ef_t *ef = (vic_ef_t *)data;
-    ef->routine(ef);
+    vic_t *vic = (vic_t *)data;
+    vic->ef->routine(vic);
     return NULL;
 }
 
-void _vic_start_helper(vic_ef_t *ef)
+void _vic_start_helper(vic_t *vic)
 {
-    cc_for_each(&ef->vic->links, link)
+    cc_for_each(&vic->links, link)
     {
         link->zmq_sock = zsock_new(link->zmq_type);
 
@@ -142,18 +144,18 @@ void _vic_start_helper(vic_ef_t *ef)
 }
 
 // Starting function for an execution flow that is a thread
-void _vic_start_thread(vic_ef_t *ef)
+void _vic_start_thread(vic_t *vic)
 {
-    _vic_start_helper(ef);
+    _vic_start_helper(vic);
 
-    ef->vic->data = malloc(sizeof(pthread_t));
-    pthread_create((pthread_t *)ef->vic->data, NULL, _vic_thread_start_helper, ef);
+    vic->data = malloc(sizeof(pthread_t));
+    pthread_create((pthread_t *)vic->data, NULL, _vic_thread_start_helper, vic);
 }
 
 // Waiting function for an execution flow that is a thread
-void _vic_wait_thread(vic_ef_t *ef)
+void _vic_wait_thread(vic_t *vic)
 {
-    pthread_t *thread = (pthread_t *)ef->vic->data;
+    pthread_t *thread = (pthread_t *)vic->data;
     pthread_join(*thread, NULL);
 }
 
@@ -167,24 +169,27 @@ void _vic_destroy_process(vic_t *vic)
 {
 }
 
+vic_ef_t *vic_ef_get(vic_t *vic) {
+    return vic->ef;
+}
+
 // Starting function for an execution flow that is a process
-void _vic_start_process(vic_ef_t *ef)
+void _vic_start_process(vic_t *vic)
 {
     // TODO : Check for the errors of fork call
 
-    ef->vic->data = (void *)(uintptr_t)fork();
+    vic->data = (void *)(uintptr_t)fork();
 
     // If the data is 0, then we are in the child process
-    if (ef->vic->data == 0)
+    if (vic->data == 0)
     {
         zsys_shutdown();
 
-        _vic_start_helper(ef);
+        _vic_start_helper(vic);
 
-        ef->routine(ef);
+        vic->ef->routine(vic);
 
-        vic_t *vic = ef->vic;
-        vic_ef_destroy(ef);
+        vic_ef_destroy(vic->ef);
         vic_destroy(vic);
 
         exit(EXIT_SUCCESS);
@@ -192,11 +197,11 @@ void _vic_start_process(vic_ef_t *ef)
 }
 
 // Waiting function for an execution flow that is a process
-void _vic_wait_process(vic_ef_t *ef)
+void _vic_wait_process(vic_t *vic)
 {
     // TODO: Check if the process is launched
 
-    waitpid((pid_t)(uintptr_t)ef->vic->data, NULL, 0);
+    waitpid((pid_t)(uintptr_t)vic->data, NULL, 0);
 }
 
 vic_t *vic_create(enum vic_abstraction_t abstraction)
@@ -226,7 +231,7 @@ vic_t *vic_create(enum vic_abstraction_t abstraction)
     return vic;
 }
 
-vic_ef_t *vic_ef_create(vic_t *vic, void (*start_routine)(vic_ef_t *), void (*finished)(vic_ef_t *))
+vic_ef_t *vic_ef_create(vic_t *vic, void (*start_routine)(vic_t *), void (*finished)(vic_t *))
 {
     vic_ef_t *ef = _ef_new();
     ef->routine = start_routine;
@@ -290,14 +295,18 @@ void vic_link(vic_t *vic1, vic_t *vic2, const char *name)
 
 void vic_ef_start(vic_ef_t *ef)
 {
-    if (ef->routine)
-        ef->vic->start(ef);
+    if (ef->routine) {
+        vic_t *vic = ef->vic;
+        vic->start(vic);
+    }
 }
 
 void vic_ef_wait(vic_ef_t *ef)
 {
-    if (ef->routine)
-        ef->vic->wait(ef);
+    if (ef->routine) {
+        vic_t *vic = ef->vic;
+        vic->wait(vic);
+    }
 }
 
 int vic_ef_send(vic_ef_t *ef, const char *name, const char *data)

@@ -18,7 +18,9 @@ vic_t *vic_init();
 vic_t *vic_create(enum vic_abstraction_t abstraction);
 
 // Create a new child execution flow
-vic_ef_t *vic_ef_create(vic_t *vic, void (*start_routine)(vic_ef_t *), void (*finished)(vic_ef_t *));
+vic_ef_t *vic_ef_create(vic_t *vic, void (*start_routine)(vic_t *), void (*finished)(vic_t *));
+
+vic_ef_t *vic_ef_get(vic_t *vic);
 
 void vic_destroy(vic_t *vic);
 

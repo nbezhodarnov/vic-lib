@@ -4,7 +4,9 @@
 
 #include "ef_lib.h"
 
-void routine3(vic_ef_t *ef){
+void routine3(vic_t *vic){
+    vic_ef_t *ef = vic_ef_get(vic);
+
     printf("routine3 started\n");
 
     printf("pid: %d\n", getpid());
@@ -28,7 +30,9 @@ void routine3(vic_ef_t *ef){
     printf("routine3 finished\n");
 };
 
-void routine4(vic_ef_t *ef) {
+void routine4(vic_t *vic) {
+    vic_ef_t *ef = vic_ef_get(vic);
+
     printf("routine4 started\n");
 
     printf("pid: %d\n", getpid());
@@ -44,8 +48,10 @@ void routine4(vic_ef_t *ef) {
     printf("routine4 finished\n");
 }
 
-void routine1(vic_ef_t *ef)
+void routine1(vic_t *vic)
 {
+    vic_ef_t *ef = vic_ef_get(vic);
+
     printf("routine1 started\n");
 
     char * data = vic_ef_recv(ef, "test1");
@@ -67,8 +73,10 @@ void routine1(vic_ef_t *ef)
     printf("routine1 finished\n");
 };
 
-void routine2(vic_ef_t *ef)
+void routine2(vic_t *vic)
 {
+    vic_ef_t *ef = vic_ef_get(vic);
+    
     printf("routine2 started\n");
 
     vic_ef_send(ef, "test1", "hello");

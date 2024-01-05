@@ -4,7 +4,9 @@ cmake_minimum_required(VERSION 3.28)
 # Project name
 project(EF_LIB_DRAFT LANGUAGES C)
 
-file(GLOB SOURCES "*.c" "*.h")
+file(GLOB_RECURSE SOURCES "*.c" "*.h")
+
+list(FILTER SOURCES EXCLUDE REGEX "build/*")
 
 # Add source files
 add_executable(${PROJECT_NAME} 
