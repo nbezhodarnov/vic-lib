@@ -1,4 +1,8 @@
 #include "vic.h"
+
+#define _GNU_SOURCE
+
+#include "features.h"
 #include "pthread.h"
 #include "stdlib.h"
 
@@ -9,6 +13,8 @@
 #include "third_party/cc/cc.h"
 
 #define ADDR_BUFFER_LEN 256
+
+#define WAIT_TIMEOUT 3
 
 // Structure representing a link between two virtual isolation contexts
 typedef struct
@@ -23,6 +29,11 @@ typedef struct
 
 typedef cc_list(_vic_link_t) _vic_link_list_t;
 
+enum _wait_result_t {
+    DONE = 0,
+    NOT_DONE = 1
+};
+
 struct _vic_t
 {
     enum vic_abstraction_t abstraction; // The abstraction of the virtual isolation context
@@ -32,7 +43,7 @@ struct _vic_t
     _vic_link_list_t links; // Pointer to the linked list of links between virtual isolation contexts
 
     void (*start)(vic_t *); // Pointer to the function that will start the execution flow
-    void (*wait)(vic_t *);  // Pointer to the function that will wait for the execution flow to finish
+    enum _wait_result_t (*wait)(vic_t *); // Pointer to the function that will wait for the execution flow to finish
 
     void (*destroy)(vic_t *); // Pointer to the function that will destroy the execution flow cleaning up all the resources
 };
@@ -41,6 +52,7 @@ struct _vic_t
 struct _vic_ef_t
 {
     vic_t *vic; // Pointer to the virtual isolation context that the execution flow belongs to
+    pthread_mutex_t lock; // Mutex lock for vic transformation
 
     void (*routine)(vic_t *);  // Pointer to the routine that the execution flow will execute
     void (*finished)(vic_t *); // Pointer to the function that will be called when the execution flow is about to be destroyed
@@ -125,6 +137,8 @@ void _vic_start_helper(vic_t *vic)
     cc_for_each(&vic->links, link)
     {
         link->zmq_sock = zsock_new(link->zmq_type);
+        zsock_set_sndtimeo(link->zmq_sock, WAIT_TIMEOUT);
+        zsock_set_rcvtimeo(link->zmq_sock, WAIT_TIMEOUT);
 
         // Disable false positive warning
 #pragma GCC diagnostic push
@@ -153,10 +167,21 @@ void _vic_start_thread(vic_t *vic)
 }
 
 // Waiting function for an execution flow that is a thread
-void _vic_wait_thread(vic_t *vic)
+enum _wait_result_t _vic_wait_thread(vic_t *vic)
 {
+    struct timespec ts;
+
     pthread_t *thread = (pthread_t *)vic->data;
-    pthread_join(*thread, NULL);
+
+    ts.tv_sec = WAIT_TIMEOUT;
+    ts.tv_nsec = 0;
+
+    int result = pthread_timedjoin_np(*thread, NULL, &ts);
+    if (result == ETIMEDOUT)
+    {
+        return NOT_DONE;
+    }
+        return DONE;
 }
 
 void _vic_destroy_thread(vic_t *vic)
@@ -196,12 +221,39 @@ void _vic_start_process(vic_t *vic)
     }
 }
 
+enum _wait_result_t waitpid_with_timeout(pid_t pid, int options, int timeout_seconds) {
+    fd_set set;
+    struct timeval timeout;
+    int status;
+
+    // Initialize the file descriptor set and timeout
+    FD_ZERO(&set);
+    FD_SET(STDIN_FILENO, &set);  // Add stdin as a dummy file descriptor
+    timeout.tv_sec = timeout_seconds;
+    timeout.tv_usec = 0;
+
+    // Wait for the child process or timeout
+    int ready = select(1, &set, NULL, NULL, &timeout);
+
+    if (ready == -1) {
+        perror("select");
+        exit(EXIT_FAILURE);
+    } else if (ready == 0) {
+        // Timeout occurred
+        return NOT_DONE;
+    } else {
+        // Child process terminated
+        waitpid(pid, &status, options);
+        return DONE;
+    }
+}
+
 // Waiting function for an execution flow that is a process
-void _vic_wait_process(vic_t *vic)
+enum _wait_result_t _vic_wait_process(vic_t *vic)
 {
     // TODO: Check if the process is launched
-
-    waitpid((pid_t)(uintptr_t)vic->data, NULL, 0);
+    pid_t pid = (pid_t)(uintptr_t)vic->data;
+    return waitpid_with_timeout(pid, 0, WAIT_TIMEOUT);
 }
 
 vic_t *vic_create(enum vic_abstraction_t abstraction)
@@ -305,7 +357,13 @@ void vic_ef_wait(vic_ef_t *ef)
 {
     if (ef->routine) {
         vic_t *vic = ef->vic;
-        vic->wait(vic);
+        enum _wait_result_t wait_result = NOT_DONE;
+
+        while (wait_result == NOT_DONE) {
+            pthread_mutex_lock(&ef->lock);
+            wait_result = vic->wait(vic);
+            pthread_mutex_unlock(&ef->lock);
+        }
     }
 }
 
@@ -319,7 +377,13 @@ int vic_ef_send(vic_ef_t *ef, const char *name, const char *data)
 
         if (strcmp(link->zmq_addr, addr) == 0)
         {
-            zstr_send(link->zmq_sock, data);
+            int result = -1;
+            while (result != 0)
+            {
+                pthread_mutex_lock(&ef->lock);
+                result = zstr_send(link->zmq_sock, data);
+                pthread_mutex_unlock(&ef->lock);
+            }
             return 1;
         }
     }
@@ -336,7 +400,16 @@ char *vic_ef_recv(vic_ef_t *ef, const char *name)
         strcat(addr, name);
 
         if (strcmp(link->zmq_addr, addr) == 0)
-            return zstr_recv(link->zmq_sock);
+        {
+            char* result = NULL;
+            while (result == NULL)
+            {
+                pthread_mutex_lock(&ef->lock);
+                result = zstr_recv(link->zmq_sock);
+                pthread_mutex_unlock(&ef->lock);
+            }
+            return result;
+        }
     }
 
     return NULL;
