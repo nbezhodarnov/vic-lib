@@ -49,7 +49,6 @@ add_custom_target(remove_generated ALL
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/generated
 )
 
-add_dependencies(${PROJECT_NAME} remove_generated)
 add_dependencies(generator remove_generated)
 
 add_custom_target(create_generated_dir ALL
@@ -60,8 +59,10 @@ add_custom_target(create_generated_dir ALL
 
 add_custom_target(run_generator ALL
     COMMAND generator ${CMAKE_CURRENT_SOURCE_DIR}/main.c ${CMAKE_BINARY_DIR}/generated
-    DEPENDS create_generated_dir ${PROJECT_NAME} generator
+    DEPENDS create_generated_dir generator
 )
+
+add_dependencies(${PROJECT_NAME} run_generator)
 
 generate_cmakelists_header(OUTPUT_DIR ${CMAKE_BINARY_DIR}/tmp PROJECT_NAME ${PROJECT_NAME}_generated)
 
@@ -122,7 +123,13 @@ add_custom_target(run_post_generator ALL
 
 add_custom_target(run_post_generator_cmake ALL
     COMMAND ${CMAKE_COMMAND} -B${CMAKE_BINARY_DIR}/generated/build -S${CMAKE_BINARY_DIR}/generated -G ${CMAKE_GENERATOR}
-    DEPENDS run_post_generator
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/generated/build
+    DEPENDS run_post_generator
     COMMENT "Running post generator cmake"
+)
+
+add_custom_target(run_post_generator_cmake_clean ALL
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/generated/build
+    DEPENDS run_post_generator_cmake
+    COMMENT "Running post generator cmake cleanning"
 )
