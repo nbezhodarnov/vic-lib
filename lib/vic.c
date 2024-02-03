@@ -201,6 +201,7 @@ void *vic_transform_prepare()
 
             if (vic->abstraction & EF_PROCESS && (unsigned int)getpid() != *thread_tid) {
                 thread_tid = cc_next(&thread_tid_list, thread_tid);
+                pthread_mutex_unlock(&vic->ef->lock);
                 continue;
             }
 
