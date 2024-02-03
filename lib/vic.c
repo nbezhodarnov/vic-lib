@@ -404,7 +404,8 @@ void _vic_start_process(vic_t *vic)
 {
     // TODO : Check for the errors of fork call
 
-    vic->data = (void *)(uintptr_t)fork();
+    vic->data = malloc(sizeof(pid_t));
+    *((pid_t *)vic->data) = fork();
 
     // If the data is 0, then we are in the child process
     if (vic->data == 0)
@@ -459,7 +460,7 @@ enum _wait_result_t waitpid_with_timeout(pid_t pid, int options, int timeout_sec
 enum _wait_result_t _vic_wait_process(vic_t *vic)
 {
     // TODO: Check if the process is launched
-    pid_t pid = (pid_t)(uintptr_t)vic->data;
+    pid_t pid = *(pid_t *)vic->data;
     return waitpid_with_timeout(pid, 0, WAIT_TIMEOUT);
 }
 
