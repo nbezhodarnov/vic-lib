@@ -162,6 +162,8 @@ void *vic_transform_prepare()
             sleep(1);
         }
 
+        *vic_transform_preparation_thread = pthread_self();
+
         address = malloc(ADDR_BUFFER_LEN);
         snprintf(address, ADDR_BUFFER_LEN, "ipc:///tmp/vic_transform_prepare_%d", getpid());
 
