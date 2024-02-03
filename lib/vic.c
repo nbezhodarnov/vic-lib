@@ -69,6 +69,7 @@ typedef cc_list(unsigned int) _uint_list_t;
 _uint_list_t thread_tid_list;
 
 pthread_t *vic_transform_preparation_thread = NULL;
+int terminate_preparation_thread = 0;
 
 void _vic_transform_thread_to_process(vic_t *vic, pid_t pid);
 void _vic_transform_process_to_thread(vic_t *vic);
@@ -100,6 +101,25 @@ void _wait_for_external_signal(zsock_t *socket, const char *signal)
     free(received_signal);
 }
 
+void _wait_for_external_signal_or_terminate(zsock_t *socket, const char *signal)
+{
+    zsock_set_rcvtimeo(socket, WAIT_TIMEOUT * 1000);
+
+    char *received_signal = NULL;
+    while (received_signal == NULL || strcmp(received_signal, signal) != 0)
+    {
+        if (terminate_preparation_thread)
+        {
+            zsock_destroy(&socket);
+            pthread_exit(NULL);
+        }
+
+        received_signal = zstr_recv(socket);
+    }
+
+    free(received_signal);
+}
+
 void *vic_transform_prepare()
 {
     for (;;)
@@ -112,7 +132,7 @@ void *vic_transform_prepare()
         zsock_t *socket = zsock_new(ZMQ_DEALER);
         zsock_bind(socket, address);
 
-        _wait_for_external_signal(socket, "prepare");
+        _wait_for_external_signal_or_terminate(socket, "prepare");
 
         cc_for_each(&vic_list, vic_ptr)
         {
@@ -216,6 +236,11 @@ void *vic_transform_prepare()
     }
 }
 
+void _send_exit_signal_to_prepare_thread()
+{
+    terminate_preparation_thread = 1;
+}
+
 vic_t *_vic_new()
 {
     vic_t *vic = malloc(sizeof(vic_t));
@@ -284,7 +309,7 @@ void vic_destroy(vic_t *vic)
 
     if (cc_size(&vic_list) == 0)
     {
-        pthread_cancel(*vic_transform_preparation_thread);
+        _send_exit_signal_to_prepare_thread();
         pthread_join(*vic_transform_preparation_thread, NULL);
         free(vic_transform_preparation_thread);
         vic_transform_preparation_thread = NULL;
@@ -326,6 +351,17 @@ void *_vic_thread_start_helper(void *data)
 
     if (getpid() != main_pid)
     {
+        vic_ef_destroy(vic->ef);
+        vic_destroy(vic);
+
+        _send_exit_signal_to_prepare_thread();
+        pthread_join(*vic_transform_preparation_thread, NULL);
+        free(vic_transform_preparation_thread);
+        vic_transform_preparation_thread = NULL;
+        cc_cleanup(&thread_tid_list);
+
+        zsys_shutdown();
+
         exit(EXIT_SUCCESS);
     }
 
