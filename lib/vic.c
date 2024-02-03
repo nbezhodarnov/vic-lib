@@ -64,6 +64,7 @@ struct _vic_with_tid_t
 {
     vic_t *vic;
     unsigned int tid;
+    bool executing;
 } _vic_with_tid_t;
 
 typedef cc_list(struct _vic_with_tid_t) _vic_list_t;
@@ -132,7 +133,7 @@ void perform_transform_threads_to_processes()
         cc_for_each(&vic_list, vic_ptr)
         {
         vic_t *vic = vic_ptr->vic;
-            if (vic->abstraction & EF_THREAD)
+        if (vic->abstraction & EF_THREAD && vic_ptr->executing)
             {
                 pthread_mutex_lock(&vic->ef->lock);
                 cc_for_each(&vic->links, link)
@@ -156,11 +157,21 @@ void perform_transform_threads_to_processes()
 
         const char *ready_signal = "ready";
         zstr_send(socket, ready_signal);
-    zstr_sendf(socket, "%u", cc_size(&vic_list));
-    cc_for_each(&vic_list, vic)
-        {
 
-        zstr_sendf(socket, "%u", vic->tid);
+    cc_list(unsigned int) tid_list;
+    cc_init(&tid_list);
+    cc_for_each(&vic_list, vic_ptr)
+    {
+        if (vic_ptr->executing)
+        {
+            cc_push(&tid_list, vic_ptr->tid);
+        }
+    }
+
+    zstr_sendf(socket, "%u", cc_size(&tid_list));
+    cc_for_each(&tid_list, tid)
+        {
+        zstr_sendf(socket, "%u", *tid);
         }
 
         zsock_destroy(&socket);
@@ -210,7 +221,13 @@ void perform_transform_threads_to_processes()
         vic_t *vic = vic_ptr->vic;
         unsigned int thread_tid = vic_ptr->tid;
 
-        if (vic->abstraction & EF_PROCESS && (unsigned int)getpid() != thread_tid) {
+        if (!vic_ptr->executing)
+        {
+            continue;
+        }
+
+        if (vic->abstraction & EF_PROCESS && (unsigned int)getpid() != thread_tid)
+        {
                 pthread_mutex_unlock(&vic->ef->lock);
                 continue;
             }
@@ -350,16 +367,21 @@ void *_vic_thread_start_helper(void *data)
     pid_t main_pid = getpid();
 
     vic_t *vic = (vic_t *)data;
+    struct _vic_with_tid_t *current_vic_ptr = NULL;
     cc_for_each(&vic_list, vic_ptr)
     {
         if (vic_ptr->vic == vic)
         {
+            current_vic_ptr = vic_ptr;
             vic_ptr->tid = syscall(__NR_gettid);
+            vic_ptr->executing = true;
             break;
         }
     }
 
     vic->ef->routine(vic);
+
+    current_vic_ptr->executing = false;
 
     if (getpid() != main_pid)
     {
@@ -621,6 +643,7 @@ vic_t *vic_create(enum vic_abstraction_t abstraction)
     struct _vic_with_tid_t vic_with_tid;
     vic_with_tid.vic = vic;
     vic_with_tid.tid = 0;
+    vic_with_tid.executing = false;
     cc_push(&vic_list, vic_with_tid);
 
     return vic;
