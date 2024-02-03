@@ -120,19 +120,12 @@ void _wait_for_external_signal_or_terminate(zsock_t *socket, const char *signal)
     free(received_signal);
 }
 
-void *vic_transform_prepare()
-{
-    for (;;)
+void perform_transform_threads_to_processes()
     {
         pid_t main_pid = getpid();
 
         char *address = malloc(ADDR_BUFFER_LEN);
         snprintf(address, ADDR_BUFFER_LEN, "ipc:///tmp/vic_transform_prepare_%d", getpid());
-
-        zsock_t *socket = zsock_new(ZMQ_DEALER);
-        zsock_bind(socket, address);
-
-        _wait_for_external_signal_or_terminate(socket, "prepare");
 
         cc_for_each(&vic_list, vic_ptr)
         {
@@ -152,14 +145,11 @@ void *vic_transform_prepare()
             }
         }
 
-        zsock_destroy(&socket);
-        socket = NULL;
-
         zsys_shutdown();
 
         int current_threads_number = _get_threads_number();
 
-        socket = zsock_new(ZMQ_DEALER);
+    zsock_t* socket = zsock_new(ZMQ_DEALER);
         zsock_bind(socket, address);
 
         const char *ready_signal = "ready";
@@ -233,6 +223,26 @@ void *vic_transform_prepare()
         }
 
         cc_cleanup(&thread_tid_list);
+}
+
+void *vic_transform_prepare()
+{
+    for (;;)
+    {
+        char *address = malloc(ADDR_BUFFER_LEN);
+        snprintf(address, ADDR_BUFFER_LEN, "ipc:///tmp/vic_transform_prepare_%d", getpid());
+
+        zsock_t *socket = zsock_new(ZMQ_DEALER);
+        zsock_bind(socket, address);
+
+        _wait_for_external_signal_or_terminate(socket, "prepare");
+
+        zsock_destroy(&socket);
+        socket = NULL;
+
+        free(address);
+
+        perform_transform_threads_to_processes();
     }
 }
 
