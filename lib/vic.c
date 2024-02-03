@@ -90,6 +90,16 @@ int get_threads_number()
     return result;
 }
 
+void _wait_for_external_signal(zsock_t *socket, const char *signal)
+{
+    char *received_signal = NULL;
+    while (received_signal == NULL || strcmp(received_signal, signal) != 0)
+    {
+        received_signal = zstr_recv(socket);
+    }
+    free(received_signal);
+}
+
 void *vic_transform_prepare()
 {
     for (;;)
@@ -102,15 +112,7 @@ void *vic_transform_prepare()
         zsock_t *socket = zsock_new(ZMQ_DEALER);
         zsock_bind(socket, address);
 
-        const char *prepare_signal = "prepare";
-
-        char *signal = NULL;
-        while (signal == NULL || strcmp(signal, prepare_signal) != 0)
-        {
-            signal = zstr_recv(socket);
-        }
-        free(signal);
-        signal = NULL;
+        _wait_for_external_signal(socket, "prepare");
 
         cc_for_each(&vic_list, vic_ptr)
         {
@@ -166,13 +168,7 @@ void *vic_transform_prepare()
         socket = zsock_new(ZMQ_DEALER);
         zsock_bind(socket, address);
 
-        const char *start_signal = "start";
-        while (signal == NULL || strcmp(signal, start_signal) != 0)
-        {
-            signal = zstr_recv(socket);
-        }
-        free(signal);
-        signal = NULL;
+        _wait_for_external_signal(socket, "start");
 
         zsock_destroy(&socket);
         socket = NULL;
