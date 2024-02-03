@@ -60,13 +60,15 @@ struct _vic_ef_t
     void (*finished)(vic_t *); // Pointer to the function that will be called when the execution flow is about to be destroyed
 } _vic_ef_t;
 
-typedef cc_list(vic_t *) _vic_list_t;
+struct _vic_with_tid_t
+{
+    vic_t *vic;
+    unsigned int tid;
+} _vic_with_tid_t;
+
+typedef cc_list(struct _vic_with_tid_t) _vic_list_t;
 
 _vic_list_t vic_list;
-
-typedef cc_list(unsigned int) _uint_list_t;
-
-_uint_list_t thread_tid_list;
 
 pthread_t *vic_transform_preparation_thread = NULL;
 int terminate_preparation_thread = 0;
@@ -129,7 +131,7 @@ void perform_transform_threads_to_processes()
 
         cc_for_each(&vic_list, vic_ptr)
         {
-            vic_t *vic = *vic_ptr;
+        vic_t *vic = vic_ptr->vic;
             if (vic->abstraction & EF_THREAD)
             {
                 pthread_mutex_lock(&vic->ef->lock);
@@ -154,10 +156,11 @@ void perform_transform_threads_to_processes()
 
         const char *ready_signal = "ready";
         zstr_send(socket, ready_signal);
-        zstr_sendf(socket, "%u", cc_size(&thread_tid_list));
-        cc_for_each(&thread_tid_list, thread_id)
+    zstr_sendf(socket, "%u", cc_size(&vic_list));
+    cc_for_each(&vic_list, vic)
         {
-            zstr_sendf(socket, "%u", *thread_id);
+
+        zstr_sendf(socket, "%u", vic->tid);
         }
 
         zsock_destroy(&socket);
@@ -187,30 +190,27 @@ void perform_transform_threads_to_processes()
 
         free(address);
 
-        unsigned int *thread_tid = cc_first(&thread_tid_list);
         cc_for_each(&vic_list, vic_ptr)
         {
-            vic_t *vic = *vic_ptr;
+        vic_t *vic = vic_ptr->vic;
+        unsigned int thread_tid = vic_ptr->tid;
 
             if (vic->abstraction & EF_THREAD)
             {
-                _vic_transform_thread_to_process(vic, (pid_t)*thread_tid);
+            _vic_transform_thread_to_process(vic, (pid_t)thread_tid);
             }
             else if (vic->abstraction & EF_PROCESS)
             {
                 _vic_transform_process_to_thread(vic);
             }
-
-            thread_tid = cc_next(&thread_tid_list, thread_tid);
         }
 
-        thread_tid = cc_first(&thread_tid_list);
         cc_for_each(&vic_list, vic_ptr)
         {
-            vic_t *vic = *vic_ptr;
+        vic_t *vic = vic_ptr->vic;
+        unsigned int thread_tid = vic_ptr->tid;
 
-            if (vic->abstraction & EF_PROCESS && (unsigned int)getpid() != *thread_tid) {
-                thread_tid = cc_next(&thread_tid_list, thread_tid);
+        if (vic->abstraction & EF_PROCESS && (unsigned int)getpid() != thread_tid) {
                 pthread_mutex_unlock(&vic->ef->lock);
                 continue;
             }
@@ -218,11 +218,7 @@ void perform_transform_threads_to_processes()
             _vic_start_helper(vic);
 
             pthread_mutex_unlock(&vic->ef->lock);
-
-            thread_tid = cc_next(&thread_tid_list, thread_tid);
         }
-
-        cc_cleanup(&thread_tid_list);
 }
 
 void *vic_transform_prepare()
@@ -284,7 +280,6 @@ vic_t *vic_init()
     main_vic->abstraction = EF_THREAD;
 
     cc_init(&vic_list);
-    cc_init(&thread_tid_list);
 
     vic_transform_preparation_thread = malloc(sizeof(pthread_t));
     pthread_create(vic_transform_preparation_thread, NULL, vic_transform_prepare, NULL);
@@ -323,14 +318,13 @@ void vic_destroy(vic_t *vic)
         pthread_join(*vic_transform_preparation_thread, NULL);
         free(vic_transform_preparation_thread);
         vic_transform_preparation_thread = NULL;
-        cc_cleanup(&thread_tid_list);
     }
     else
     {
-        vic_t **vic_element = cc_first(&vic_list);
+        struct _vic_with_tid_t *vic_element = cc_first(&vic_list);
         for (; vic_element != cc_end(&vic_list); vic_element = cc_next(&vic_list, vic_element))
         {
-            if (*vic_element == vic)
+            if (vic_element->vic == vic)
             {
                 vic_element = cc_erase(&vic_list, vic_element);
                 break;
@@ -356,7 +350,15 @@ void *_vic_thread_start_helper(void *data)
     pid_t main_pid = getpid();
 
     vic_t *vic = (vic_t *)data;
-    cc_push(&thread_tid_list, syscall(__NR_gettid));
+    cc_for_each(&vic_list, vic_ptr)
+    {
+        if (vic_ptr->vic == vic)
+        {
+            vic_ptr->tid = syscall(__NR_gettid);
+            break;
+        }
+    }
+
     vic->ef->routine(vic);
 
     if (getpid() != main_pid)
@@ -368,7 +370,6 @@ void *_vic_thread_start_helper(void *data)
         pthread_join(*vic_transform_preparation_thread, NULL);
         free(vic_transform_preparation_thread);
         vic_transform_preparation_thread = NULL;
-        cc_cleanup(&thread_tid_list);
 
         zsys_shutdown();
 
@@ -617,7 +618,10 @@ vic_t *vic_create(enum vic_abstraction_t abstraction)
         exit(EXIT_FAILURE);
     }
 
-    cc_push(&vic_list, vic);
+    struct _vic_with_tid_t vic_with_tid;
+    vic_with_tid.vic = vic;
+    vic_with_tid.tid = 0;
+    cc_push(&vic_list, vic_with_tid);
 
     return vic;
 }
