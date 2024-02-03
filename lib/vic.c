@@ -118,6 +118,11 @@ void *vic_transform_prepare()
             if (vic->abstraction & EF_THREAD)
             {
                 pthread_mutex_lock(&vic->ef->lock);
+                cc_for_each(&vic->links, link)
+                {
+                    zsock_destroy(&link->zmq_sock);
+                    link->zmq_sock = NULL;
+                }
             }
             else if (vic->abstraction & EF_PROCESS)
             {
