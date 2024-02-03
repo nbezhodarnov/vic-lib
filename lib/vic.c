@@ -481,6 +481,12 @@ enum _wait_result_t waitpid_with_timeout(pid_t pid, int options, int timeout_sec
     }
     else if (ready == 0)
     {
+        if (waitpid(pid, &status, options | WNOHANG) == pid)
+        {
+            // Child process became zombie
+            return DONE;
+        }
+
         // Timeout occurred
         return NOT_DONE;
     }
