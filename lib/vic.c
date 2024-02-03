@@ -76,7 +76,7 @@ void _vic_transform_process_to_thread(vic_t *vic);
 
 void _vic_start_helper(vic_t *vic);
 
-int get_threads_number()
+int _get_threads_number()
 {
     int result = 0;
     DIR *dir = opendir("/proc/self/task");
@@ -157,7 +157,7 @@ void *vic_transform_prepare()
 
         zsys_shutdown();
 
-        int current_threads_number = get_threads_number();
+        int current_threads_number = _get_threads_number();
 
         socket = zsock_new(ZMQ_DEALER);
         zsock_bind(socket, address);
@@ -177,7 +177,7 @@ void *vic_transform_prepare()
 
         zsys_shutdown();
 
-        while (getpid() == main_pid && get_threads_number() == current_threads_number)
+        while (getpid() == main_pid && _get_threads_number() == current_threads_number)
         {
             sleep(1);
         }
