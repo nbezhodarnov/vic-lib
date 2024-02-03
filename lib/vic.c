@@ -337,8 +337,8 @@ void _vic_start_helper(vic_t *vic)
     cc_for_each(&vic->links, link)
     {
         link->zmq_sock = zsock_new(link->zmq_type);
-        zsock_set_sndtimeo(link->zmq_sock, WAIT_TIMEOUT);
-        zsock_set_rcvtimeo(link->zmq_sock, WAIT_TIMEOUT);
+        zsock_set_sndtimeo(link->zmq_sock, WAIT_TIMEOUT * 1000);
+        zsock_set_rcvtimeo(link->zmq_sock, WAIT_TIMEOUT * 1000);
 
         // Disable false positive warning
 #pragma GCC diagnostic push
