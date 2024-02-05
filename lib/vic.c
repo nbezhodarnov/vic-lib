@@ -470,7 +470,7 @@ void _vic_start_process(vic_t *vic)
     *((pid_t *)vic->data) = fork();
 
     // If the data is 0, then we are in the child process
-    if (vic->data == 0)
+    if (*((pid_t *)vic->data) == 0)
     {
         zsys_shutdown();
 
