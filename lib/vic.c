@@ -127,7 +127,7 @@ void perform_transform_threads_to_processes()
     {
         pid_t main_pid = getpid();
 
-        char *address = malloc(ADDR_BUFFER_LEN);
+    char address[ADDR_BUFFER_LEN] = {};
         snprintf(address, ADDR_BUFFER_LEN, "ipc:///tmp/vic_transform_prepare_%d", getpid());
 
         cc_for_each(&vic_list, vic_ptr)
@@ -177,8 +177,6 @@ void perform_transform_threads_to_processes()
         zsock_destroy(&socket);
         socket = NULL;
 
-        free(address);
-
         zsys_shutdown();
 
         while (getpid() == main_pid && _get_threads_number() == current_threads_number)
@@ -188,7 +186,6 @@ void perform_transform_threads_to_processes()
 
         *vic_transform_preparation_thread = pthread_self();
 
-        address = malloc(ADDR_BUFFER_LEN);
         snprintf(address, ADDR_BUFFER_LEN, "ipc:///tmp/vic_transform_prepare_%d", getpid());
 
         socket = zsock_new(ZMQ_DEALER);
@@ -198,8 +195,6 @@ void perform_transform_threads_to_processes()
 
         zsock_destroy(&socket);
         socket = NULL;
-
-        free(address);
 
         cc_for_each(&vic_list, vic_ptr)
         {
@@ -242,7 +237,7 @@ void *vic_transform_prepare()
 {
     for (;;)
     {
-        char *address = malloc(ADDR_BUFFER_LEN);
+        char address[ADDR_BUFFER_LEN] = {};
         snprintf(address, ADDR_BUFFER_LEN, "ipc:///tmp/vic_transform_prepare_%d", getpid());
 
         zsock_t *socket = zsock_new(ZMQ_DEALER);
@@ -252,8 +247,6 @@ void *vic_transform_prepare()
 
         zsock_destroy(&socket);
         socket = NULL;
-
-        free(address);
 
         perform_transform_threads_to_processes();
     }
