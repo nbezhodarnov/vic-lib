@@ -366,6 +366,8 @@ void perform_transform_processes_to_threads()
                 cc_push(&threads_list, thread_info);
 
                 pthread_pause(thread);
+
+                pthread_resume(thread);
             }
         }
 
@@ -447,8 +449,6 @@ void perform_transform_processes_to_threads()
                 _vic_start_helper(vic);
 
                 pthread_mutex_unlock(&vic->ef->lock);
-
-                pthread_resume(vic_ptr->thread);
             }
         }
 
@@ -489,6 +489,8 @@ void perform_transform_processes_to_threads()
     printf("Pausing process thread\n");
     pthread_pause(process_thread);
     printf("Process thread paused\n");
+
+    pthread_resume(process_thread);
 
     zsock_t *socket = zsock_new(ZMQ_DEALER);
     zsock_bind(socket, address);
