@@ -879,7 +879,6 @@ void _vic_reinit_links(vic_t *vic)
 
         link->zmq_addr = addr;
 
-        cc_push(&vic->links, *link);
         free(name);
     }
 }
