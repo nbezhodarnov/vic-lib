@@ -58,10 +58,11 @@ def _max_stack_size(workers_backtrace):
     max_stack_size = 0
     for worker_backtrace in workers_backtrace:
         stack_end = worker_backtrace["backtrace"][-4]["sp"] # -4 to skip main() specific stack frames
-        stack_start = worker_backtrace["backtrace"][0]["sp"] + get_byte_depth() * 10 # backtrace doesn't contain current stack frame
+        stack_start = worker_backtrace["backtrace"][0]["sp"]
         stack_size = stack_end - stack_start
         if stack_size > max_stack_size:
             max_stack_size = stack_size
+    max_stack_size += get_byte_depth() * 10 # backtrace doesn't contain current stack frame
     return max_stack_size
 
 # def print_stack(stack):
