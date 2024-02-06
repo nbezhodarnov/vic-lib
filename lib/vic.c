@@ -866,10 +866,10 @@ void _vic_reinit_links(vic_t *vic)
 
         link->zmq_type = transport_params->zmq_type;
 
-        zstr_free(&link->zmq_transport_prefix);
+        free(link->zmq_transport_prefix);
         link->zmq_transport_prefix = strdup(transport_params->transport_prefix);
 
-        zstr_free(&link->zmq_addr);
+        free(link->zmq_addr);
         
         int total_len = strlen(link->zmq_transport_prefix) + strlen(name) + 1;
         char *addr = (char *)calloc(total_len, sizeof(char));
