@@ -270,6 +270,8 @@ void perform_transform_threads_to_processes()
 
         pthread_mutex_unlock(&vic->ef->lock);
     }
+
+    current_abstraction = EF_PROCESS;
 }
 
 void* _infinite_loop(void* data)
@@ -453,6 +455,8 @@ void perform_transform_processes_to_threads()
         }
 
         printf("Resumed threads\n");
+
+        current_abstraction = EF_THREAD;
 
         return;
     }
