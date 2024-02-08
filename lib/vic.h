@@ -7,6 +7,10 @@ typedef struct _vic_t vic_t;
 // Forward declaration of the execution flow structure
 typedef struct _vic_ef_t vic_ef_t;
 
+#include "dynamic_allocation.h"
+
+data_ptr_definion(char)
+
 enum vic_abstraction_t {
     EF_THREAD = 0x01,
     EF_PROCESS = 0x02
@@ -26,9 +30,9 @@ void vic_destroy(vic_t *vic);
 
 void vic_ef_destroy(vic_ef_t *ef);
 
-int vic_ef_send(vic_ef_t *ef, const char* name, const char* data);
+int vic_ef_send(vic_ef_t *ef, const char* name, const char data[]);
 
-char* vic_ef_recv(vic_ef_t *ef, const char* name);
+data_ptr(char) vic_ef_recv(vic_ef_t *ef, const char* name);
 
 // Link two execution flows together
 void vic_link(vic_t *vic1, vic_t *vic2, const char *name);

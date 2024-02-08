@@ -1,7 +1,6 @@
 #include "vic.h"
 
 #include "pause_thread.h"
-#include "dynamic_allocation.h"
 
 #define _GNU_SOURCE
 
@@ -17,6 +16,8 @@
 
 #define CC_NO_SHORT_NAMES
 #include "third_party/cc/cc.h"
+
+data_ptr_implementation(char)
 
 #define ADDR_BUFFER_LEN 256
 
@@ -982,6 +983,14 @@ vic_ef_t *vic_ef_create(vic_t *vic, void (*start_routine)(vic_t *), void (*finis
     vic->ef = ef;
     ef->vic = vic;
 
+    pthread_mutexattr_t attr;
+
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&ef->lock, &attr);
+
+    pthread_mutexattr_destroy(&attr);
+
     return ef;
 }
 
@@ -1054,7 +1063,7 @@ void vic_ef_wait(vic_ef_t *ef)
     }
 }
 
-int vic_ef_send(vic_ef_t *ef, const char *name, const char *data)
+int vic_ef_send(vic_ef_t *ef, const char *name, const char data[])
 {
     cc_for_each(&ef->vic->links, link)
     {
@@ -1078,7 +1087,7 @@ int vic_ef_send(vic_ef_t *ef, const char *name, const char *data)
     return 0;
 }
 
-char *vic_ef_recv(vic_ef_t *ef, const char *name)
+data_ptr(char) vic_ef_recv(vic_ef_t *ef, const char *name)
 {
     cc_for_each(&ef->vic->links, link)
     {
@@ -1088,18 +1097,27 @@ char *vic_ef_recv(vic_ef_t *ef, const char *name)
 
         if (strcmp(link->zmq_addr, addr) == 0)
         {
-            char *result = NULL;
-            while (result == NULL)
+            data_ptr(char) result;
+
+            char *message = NULL;
+            while (message == NULL)
             {
                 pthread_mutex_lock(&ef->lock);
-                result = zstr_recv(link->zmq_sock);
+
+                message = zstr_recv(link->zmq_sock);
+
+                size_t message_len = strlen(message) + 1;
+                result = allocate_array(char, message_len, ef);
+
+                write_all_values_to_array(result, message, message_len);
+
                 pthread_mutex_unlock(&ef->lock);
             }
             return result;
         }
     }
 
-    return NULL;
+    return NULLPTR(char);
 }
 
 void _ef_lock(vic_ef_t *ef)

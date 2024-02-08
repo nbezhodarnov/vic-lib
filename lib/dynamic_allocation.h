@@ -1,7 +1,7 @@
 #ifndef DYNAMIC_ALLOCATION_H
 #define DYNAMIC_ALLOCATION_H
 
-#include "vic.h"
+typedef struct _vic_ef_t vic_ef_t;
 
 void _ef_lock(vic_ef_t* ef);
 void _ef_unlock(vic_ef_t* ef);
@@ -27,7 +27,7 @@ void _write(data_pointer ptr, void* value);
 void _write_to_array(data_pointer ptr, unsigned int index, void* value);
 void _write_values_to_array(data_pointer ptr, void* values, unsigned int size, unsigned int start_index, unsigned int end_index);
 
-#define define_data_ptr(type) \
+#define data_ptr_definion(type) \
     struct _ptr_##type; \
     \
     typedef struct _ptr_functions_##type {  \
@@ -52,6 +52,14 @@ void _write_values_to_array(data_pointer ptr, void* values, unsigned int size, u
     void _write_to_array_##type(struct _ptr_##type ptr, unsigned int index, type value); \
     void _write_values_to_array_##type(struct _ptr_##type ptr, type values[], unsigned int size, unsigned int start_index, unsigned int end_index); \
     \
+    typedef struct _ptr_##type { \
+        unsigned long long int key; \
+        unsigned long long int tid; \
+        _ptr_functions_##type* functions; \
+        vic_ef_t* ef; \
+    } _ptr_##type;
+
+#define data_ptr_implementation(type) \
     _ptr_functions_##type _ptr_##type##_functions = { \
         _allocate_##type, \
         _allocate_array_##type, \
@@ -63,13 +71,6 @@ void _write_values_to_array(data_pointer ptr, void* values, unsigned int size, u
         _write_to_array_##type, \
         _write_values_to_array_##type \
     }; \
-    \
-    typedef struct _ptr_##type { \
-        unsigned long long int key; \
-        unsigned long long int tid; \
-        _ptr_functions_##type* functions; \
-        vic_ef_t* ef; \
-    } _ptr_##type; \
     \
     _ptr_##type _allocate_##type(vic_ef_t* ef) { \
         data_pointer base_ptr = _allocate(sizeof(type)); \
@@ -156,7 +157,14 @@ void _write_values_to_array(data_pointer ptr, void* values, unsigned int size, u
         _ef_unlock(ptr.ef); \
     }
 
+#define define_data_ptr(type) \
+    data_ptr_definion(type) \
+    data_ptr_implementation(type)
+
 #define data_ptr(type) _ptr_##type
+
+#define NULLPTR(type) \
+    (data_ptr(type)){.key = 0, .tid = 0, .functions = NULL, .ef = NULL}
 
 #define allocate(type, ef) _allocate_##type(ef)
 #define allocate_array(type, size, ef) _allocate_array_##type(size, ef)
