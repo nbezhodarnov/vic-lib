@@ -1,6 +1,7 @@
 #include "vic.h"
 
 #include "pause_thread.h"
+#include "dynamic_allocation.h"
 
 #define _GNU_SOURCE
 
@@ -434,6 +435,15 @@ void perform_transform_processes_to_threads()
                 continue;
             }
 
+            pid_t current_process_pid = *(pid_t *)vic->data;
+
+            char filename[256];
+            snprintf(filename, sizeof(filename), "/tmp/%d-dynamic-data.tpl", current_process_pid);
+
+            printf("Importing dynamic data from file: %s\n", filename);
+
+            import_dynamic_data(filename);
+
             printf("Converting process to thread\n");
 
             _vic_transform_process_to_thread(vic, vic_ptr->thread);
@@ -495,6 +505,11 @@ void perform_transform_processes_to_threads()
     printf("Process thread paused\n");
 
     pthread_resume(process_thread);
+
+    char filename[256];
+    snprintf(filename, sizeof(filename), "/tmp/%d-dynamic-data.tpl", process_pid);
+
+    export_dynamic_data(filename);
 
     zsock_t *socket = zsock_new(ZMQ_DEALER);
     zsock_bind(socket, address);
@@ -570,6 +585,8 @@ vic_t *vic_init()
 {
     pthread_pause_enable();
 
+    _init_dynamic_memory();
+
     vic_t *main_vic = _vic_new();
     main_vic->abstraction = EF_THREAD;
 
@@ -612,6 +629,7 @@ void vic_destroy(vic_t *vic)
         _send_exit_signal_to_prepare_thread();
         pthread_join(vic_transform_preparation_thread, NULL);
         vic_transform_preparation_thread = 0;
+        _destroy_dynamic_memory();
     }
     else
     {
@@ -675,6 +693,8 @@ void *_vic_thread_start_helper(void *data)
         _send_exit_signal_to_prepare_thread();
         pthread_join(vic_transform_preparation_thread, NULL);
         vic_transform_preparation_thread = 0;
+
+        _destroy_dynamic_memory();
 
         zsys_shutdown();
 
@@ -787,6 +807,8 @@ void _vic_start_process(vic_t *vic)
         {
             pthread_exit(NULL);
         }
+
+        _destroy_dynamic_memory();
 
         exit(EXIT_SUCCESS);
     }
@@ -1078,4 +1100,14 @@ char *vic_ef_recv(vic_ef_t *ef, const char *name)
     }
 
     return NULL;
+}
+
+void _ef_lock(vic_ef_t *ef)
+{
+    pthread_mutex_lock(&ef->lock);
+}
+
+void _ef_unlock(vic_ef_t *ef)
+{
+    pthread_mutex_unlock(&ef->lock);
 }

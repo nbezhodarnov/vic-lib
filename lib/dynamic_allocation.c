@@ -1,5 +1,7 @@
 #include "dynamic_allocation.h"
 
+#include <tpl.h>
+
 #include <threads.h>
 #include <stdatomic.h>
 #include <signal.h>
@@ -7,6 +9,10 @@
 
 #define _GNU_SOURCE
 #include <unistd.h>
+
+#include <assert.h>
+
+#include <stdio.h>
 
 int _compare(data_pointer val_1, data_pointer val_2) {
     if (val_1.tid < val_2.tid) {
@@ -34,14 +40,38 @@ int _compare(data_pointer val_1, data_pointer val_2) {
 
 typedef struct base_data_allocation_struct {
     void *data;
-    unsigned int size;
-    unsigned int capacity;
+    unsigned long long size;
+    unsigned long long capacity;
 } base_data_allocation_struct;
 
 cc_map(data_pointer, base_data_allocation_struct) dynamic_memory_storage;
 atomic_int key_counter = 0;
 
 bool initialized = false;
+
+void _init_dynamic_memory()
+{
+    if (!initialized) {
+        initialized = true;
+        cc_init(&dynamic_memory_storage);
+    }
+}
+
+void _destroy_dynamic_memory()
+{
+    if (!initialized) {
+        return;
+    }
+
+    if (cc_size(&dynamic_memory_storage) > 0) {
+        cc_for_each(&dynamic_memory_storage, key_ptr, value_ptr) {
+            free(value_ptr->data);
+        }
+    }
+
+    cc_cleanup(&dynamic_memory_storage);
+    initialized = false;
+}
 
 data_pointer _allocate(unsigned int type_size)
 {
@@ -149,4 +179,46 @@ void _write_values_to_array(data_pointer ptr, void* values, unsigned int size, u
     if (base_data != NULL) {
         memcpy((char*)base_data->data + start_index * base_data->size, values, (end_index - start_index) * base_data->size);
     }
+}
+
+void export_dynamic_data(char* filename)
+{
+    data_pointer key = {0, 0};
+    base_data_allocation_struct value = {NULL, 0, 0};
+
+    tpl_bin tb;
+    tpl_node *tn = tpl_map("A(UUUUB)", &key.key, &key.tid, &value.size, &value.capacity, &tb);
+
+    cc_for_each(&dynamic_memory_storage, key_ptr, value_ptr) {
+        key.key = key_ptr->key;
+        key.tid = key_ptr->tid;
+
+        tb.addr = value_ptr->data;
+        tb.sz = value_ptr->size * value_ptr->capacity;
+        value.size = value_ptr->size;
+        value.capacity = value_ptr->capacity;
+
+        tpl_pack(tn, 1);
+    }
+
+    tpl_dump(tn, TPL_FILE, filename);
+    tpl_free(tn);
+}
+
+void import_dynamic_data(char* filename)
+{
+    data_pointer key = {0, 0};
+    base_data_allocation_struct value = {NULL, 0, 0};
+
+    tpl_bin tb;
+    tpl_node *tn = tpl_map("A(UUUUB)", &key.key, &key.tid, &value.size, &value.capacity, &tb);
+    tpl_load(tn, TPL_FILE, filename);
+
+    while (tpl_unpack(tn, 1) > 0) {
+        value.data = tb.addr;
+
+        cc_insert(&dynamic_memory_storage, key, value);
+    }
+
+    tpl_free(tn);
 }
