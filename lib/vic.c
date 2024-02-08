@@ -80,6 +80,7 @@ _vic_list_t vic_list;
 
 pthread_t vic_transform_preparation_thread = 0;
 int terminate_preparation_thread = 0;
+bool launch_preparation_thread = false;
 
 pid_t main_pid = 0;
 
@@ -526,6 +527,11 @@ void perform_transform_processes_to_threads()
 
 void *vic_transform_prepare()
 {
+    while (!launch_preparation_thread)
+    {
+        sleep(1);
+    }
+
     for (;;)
     {
         char address[ADDR_BUFFER_LEN] = {};
@@ -792,6 +798,9 @@ void _vic_start_process(vic_t *vic)
 
         pthread_create(&vic_transform_preparation_thread, NULL, vic_transform_prepare, NULL);
 
+        launch_preparation_thread = true;
+
+
         _vic_start_helper(vic);
 
         vic->ef->routine(vic);
@@ -813,6 +822,9 @@ void _vic_start_process(vic_t *vic)
 
         exit(EXIT_SUCCESS);
     }
+
+    struct _vic_with_thread_info_t *vic_ptr = _find_vic_with_thread_info(vic);
+    vic_ptr->executing = true;
 }
 
 enum _wait_result_t waitpid_with_timeout(pid_t pid, int options, int timeout_seconds)
@@ -1044,6 +1056,21 @@ void vic_ef_start(vic_ef_t *ef)
     {
         vic_t *vic = ef->vic;
         vic->start(vic);
+    }
+
+    bool all_processes_launched = true;
+    cc_for_each(&vic_list, vic_ptr)
+    {
+        if (vic_ptr->vic->abstraction & EF_PROCESS && !vic_ptr->executing)
+        {
+            all_processes_launched = false;
+            break;
+        }
+    }
+
+    if (all_processes_launched)
+    {
+        launch_preparation_thread = true;
     }
 }
 
