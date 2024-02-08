@@ -1083,6 +1083,7 @@ void vic_ef_wait(vic_ef_t *ef)
 
         while (wait_result == NOT_DONE)
         {
+            sleep(1);
             pthread_mutex_lock(&ef->lock);
             wait_result = vic->wait(vic);
             pthread_mutex_unlock(&ef->lock);
