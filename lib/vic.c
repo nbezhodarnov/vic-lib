@@ -83,6 +83,7 @@ int terminate_preparation_thread = 0;
 bool launch_preparation_thread = false;
 
 pid_t main_pid = 0;
+vic_t* main_vic = NULL;
 
 enum vic_abstraction_t current_abstraction;
 
@@ -180,6 +181,9 @@ void perform_transform_threads_to_processes()
     char address[ADDR_BUFFER_LEN] = {};
     snprintf(address, ADDR_BUFFER_LEN, "ipc:///tmp/vic_transform_prepare_%d", getpid());
 
+    pthread_mutex_lock(&main_vic->ef->lock);
+    _vic_disconnect_links(main_vic);
+
     cc_for_each(&vic_list, vic_ptr)
     {
         vic_t *vic = vic_ptr->vic;
@@ -274,6 +278,10 @@ void perform_transform_threads_to_processes()
         pthread_mutex_unlock(&vic->ef->lock);
     }
 
+    _vic_transform_thread_to_process(main_vic, main_pid);
+    _vic_start_helper(main_vic);
+    pthread_mutex_unlock(&main_vic->ef->lock);
+
     current_abstraction = EF_PROCESS;
 }
 
@@ -291,6 +299,8 @@ void* _infinite_loop(void* data)
 }
 
 enum _wait_result_t _vic_wait_process(vic_t *vic);
+
+void _vic_reinit_links(vic_t *vic);
 
 void perform_transform_processes_to_threads()
 {
@@ -332,6 +342,9 @@ void perform_transform_processes_to_threads()
         };
 
         printf("Locking all locks\n");
+
+        pthread_mutex_lock(&main_vic->ef->lock);
+        _vic_disconnect_links(main_vic);
 
         cc_list(struct process_transformation_info_t) threads_list;
         cc_init(&threads_list);
@@ -466,6 +479,18 @@ void perform_transform_processes_to_threads()
             }
         }
 
+        if (main_vic->abstraction & EF_PROCESS)
+        {
+            _vic_transform_process_to_thread(main_vic, 0);
+        }
+        else
+        {
+            _vic_reinit_links(main_vic);
+        }
+
+        _vic_start_helper(main_vic);
+        pthread_mutex_unlock(&main_vic->ef->lock);
+
         printf("Resumed threads\n");
 
         current_abstraction = EF_THREAD;
@@ -594,16 +619,17 @@ vic_t *vic_init()
 
     _init_dynamic_memory();
 
-    vic_t *main_vic = _vic_new();
-    main_vic->abstraction = EF_THREAD;
+    vic_t *new_main_vic = _vic_new();
+    new_main_vic->abstraction = EF_THREAD;
 
     cc_init(&vic_list);
 
     pthread_create(&vic_transform_preparation_thread, NULL, vic_transform_prepare, NULL);
 
     main_pid = getpid();
+    main_vic = new_main_vic;
 
-    return main_vic;
+    return new_main_vic;
 }
 
 void _vic_destroy_helper(vic_t *vic)
