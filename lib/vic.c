@@ -775,11 +775,14 @@ void _vic_start_thread(vic_t *vic)
 enum _wait_result_t _vic_wait_thread(vic_t *vic)
 {
     struct timespec ts;
+    if(clock_gettime(CLOCK_REALTIME, &ts) == -1)
+    {
+    	perror("clock_gettime");
+    }
+
+    ts.tv_sec += WAIT_TIMEOUT;
 
     pthread_t *thread = (pthread_t *)vic->data;
-
-    ts.tv_sec = WAIT_TIMEOUT;
-    ts.tv_nsec = 0;
 
     int result = pthread_timedjoin_np(*thread, NULL, &ts);
     if (result == ETIMEDOUT)
@@ -1110,9 +1113,9 @@ void vic_ef_wait(vic_ef_t *ef)
         while (wait_result == NOT_DONE)
         {
             sleep(1);
-            pthread_mutex_lock(&ef->lock);
+            pthread_mutex_lock(&main_vic->ef->lock);
             wait_result = vic->wait(vic);
-            pthread_mutex_unlock(&ef->lock);
+            pthread_mutex_unlock(&main_vic->ef->lock);
         }
     }
 }
